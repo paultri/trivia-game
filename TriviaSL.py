@@ -5,6 +5,7 @@ import html
 from thefuzz import fuzz
 from gtts import gTTS
 import base64
+import io
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Trivial Pursuit", page_icon="🏆", layout="centered")
@@ -27,16 +28,17 @@ CATEGORY_MAP = {
 
 # --- AUDIO PLAYER HELPER ---
 def autoplay_audio(text):
-    """Generates speech via gTTS and embeds it as an hidden autoplaying audio element."""
+    """Generates speech via gTTS and embeds it dynamically using an isolated audio container."""
     try:
         tts = gTTS(text=text, lang='en', slow=False)
-        import io
         mp3_fp = io.BytesIO()
         tts.write_to_fp(mp3_fp)
         mp3_fp.seek(0)
-        
         b64 = base64.b64encode(mp3_fp.read()).decode()
+        
+        # Isolated HTML5 audio block that auto-plays cleanly
         md = f"""
+            <iframe src="data:audio/mp3;base64,{b64}" allow="autoplay" style="display:none" id="audio_iframe"></iframe>
             <audio autoplay style="display:none;">
             <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
             </audio>
@@ -119,6 +121,7 @@ if not st.session_state.game_started:
 else:
     st.title("🎲 Trivial Pursuit Party")
     
+    # Run audio if there is any queued up for this specific page render
     if st.session_state.audio_to_play:
         autoplay_audio(st.session_state.audio_to_play)
         st.session_state.audio_to_play = "" 
@@ -182,6 +185,7 @@ else:
         # Action Bar: Repeat Question Side-by-Side with the host expander
         col1, col2 = st.columns([1, 1])
         with col1:
+            # We explicitly target the audio queue and reset the mic instance key so it triggers fresh audio
             if st.button("🔊 Repeat Question", use_container_width=True):
                 st.session_state.audio_to_play = f"The question is: {st.session_state.current_question}"
                 st.rerun()
