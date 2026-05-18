@@ -189,10 +189,15 @@ else:
             with st.expander("Show Secret Answer"):
                 st.write(f"Expected Answer: **{st.session_state.current_answer}**")
             
-        st.write("The microphone is active! Speak your answer clearly below:")
+        st.write("Blurt out your answer clearly, then click the stop button to process:")
         
-        # Micro-widget configured as a seamless one-tap flow listener
-        spoken_text = speech_to_text(start_prompt="🔴 LISTENING FOR ANSWER...", stop_prompt="⏹️ PROCESS NOW", language='en', key=f'speech_{st.session_state.questions_asked_this_turn}')
+        # We explicitly changed start_prompt to indicate it's running immediately
+        spoken_text = speech_to_text(
+            start_prompt="🔴 CLICK HERE TO STOP & SUBMIT", 
+            stop_prompt="⏹️ PROCESSING...", 
+            language='en', 
+            key=f'speech_{st.session_state.questions_asked_this_turn}'
+        )
         
         if spoken_text:
             user_ans = spoken_text.strip().lower()
@@ -214,7 +219,7 @@ else:
                         st.session_state.turn_phase = "resolved"
                         st.session_state.audio_to_play = f"That is correct! You have unlocked your final category. Your turn is complete."
                     elif st.session_state.questions_asked_this_turn < 2:
-                        # Setup bonus question text directly to avoid extra transitional clicking
+                        # Auto-load the bonus round details behind the scenes
                         remaining = list(set(CATEGORY_MAP.keys()) - st.session_state.game_state[current_player]["completed_categories"])
                         st.session_state.chosen_category = random.choice(remaining)
                         q, a = fetch_filtered_question(st.session_state.chosen_category)
