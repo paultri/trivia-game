@@ -179,7 +179,7 @@ else:
             user_ans = spoken_text.strip().lower()
             correct_ans = st.session_state.current_answer
             
-            match_score = fuzz.partial_ratio(correct_answer=correct_ans, string_to_test=user_ans)
+            match_score = fuzz.partial_ratio(correct_ans, user_ans)
             is_correct = match_score >= 80 or correct_ans in user_ans
             
             st.session_state.user_said = spoken_text
