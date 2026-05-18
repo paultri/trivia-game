@@ -9,7 +9,6 @@ import base64
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Trivial Pursuit", page_icon="🏆", layout="centered")
 
-# Custom CSS to hide standard deploy buttons
 st.markdown("""
     <style>
     .stDeployButton {display:none;}
@@ -85,7 +84,7 @@ if "game_started" not in st.session_state:
     st.session_state.players = []
     st.session_state.game_state = {}
     st.session_state.current_idx = 0
-    st.session_state.turn_phase = "start"  # Phases: "start", "listening", "bonus_ready", "resolved", "game_over"
+    st.session_state.turn_phase = "start"
     st.session_state.current_question = ""
     st.session_state.current_answer = ""
     st.session_state.chosen_category = ""
@@ -120,10 +119,9 @@ if not st.session_state.game_started:
 else:
     st.title("🎲 Trivial Pursuit Party")
     
-    # Run audio if there is any queued up for this specific page render
     if st.session_state.audio_to_play:
         autoplay_audio(st.session_state.audio_to_play)
-        st.session_state.audio_to_play = "" # Clear it immediately so it doesn't repeat loop
+        st.session_state.audio_to_play = "" 
     
     players = st.session_state.players
     current_player = players[st.session_state.current_idx]
@@ -181,8 +179,15 @@ else:
         st.markdown(f"### Category: *{st.session_state.chosen_category}*")
         st.warning(f"**Question for {current_player}:** {st.session_state.current_question}")
         
-        with st.expander("Show Secret Answer (Host Only)"):
-            st.write(f"Expected Answer: **{st.session_state.current_answer}**")
+        # Action Bar: Repeat Question Side-by-Side with the host expander
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("🔊 Repeat Question", use_container_width=True):
+                st.session_state.audio_to_play = f"The question is: {st.session_state.current_question}"
+                st.rerun()
+        with col2:
+            with st.expander("Show Secret Answer"):
+                st.write(f"Expected Answer: **{st.session_state.current_answer}**")
             
         st.write("Tap the microphone button, say your answer clearly, and stop recording:")
         
@@ -214,7 +219,6 @@ else:
                         st.session_state.audio_to_play = f"That is correct! Category unlocked."
             else:
                 st.session_state.turn_phase = "resolved"
-                # Queue up the text audio detailing the wrong answer and the correct fix
                 st.session_state.audio_to_play = f"Incorrect. You said {user_ans}. The correct answer was {correct_ans}."
             st.rerun()
 
