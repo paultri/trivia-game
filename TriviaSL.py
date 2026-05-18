@@ -9,7 +9,7 @@ import base64
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Trivial Pursuit", page_icon="🏆", layout="centered")
 
-# Custom CSS to hide the standard Streamlit mic recorder text if it shows up
+# Custom CSS to hide standard deploy buttons
 st.markdown("""
     <style>
     .stDeployButton {display:none;}
@@ -170,7 +170,6 @@ else:
             st.session_state.turn_phase = "listening"
             st.session_state.questions_asked_this_turn += 1
             
-            # Queue up the text to speak out loud on the next page draw
             if st.session_state.is_winning_turn:
                 st.session_state.audio_to_play = f"{current_player}, this is for the win. Your category is {st.session_state.chosen_category}. Here is the question: {q}"
             else:
@@ -207,12 +206,16 @@ else:
                     
                     if len(st.session_state.game_state[current_player]["completed_categories"]) == 6:
                         st.session_state.turn_phase = "resolved"
+                        st.session_state.audio_to_play = f"That is correct! You have unlocked your final category. Your turn is complete."
                     elif st.session_state.questions_asked_this_turn < 2:
                         st.session_state.turn_phase = "bonus_ready"
                     else:
                         st.session_state.turn_phase = "resolved"
+                        st.session_state.audio_to_play = f"That is correct! Category unlocked."
             else:
                 st.session_state.turn_phase = "resolved"
+                # Queue up the text audio detailing the wrong answer and the correct fix
+                st.session_state.audio_to_play = f"Incorrect. You said {user_ans}. The correct answer was {correct_ans}."
             st.rerun()
 
     # --- PHASE 2.5: BONUS READY TRAFFIC CONTROL ---
@@ -229,7 +232,6 @@ else:
             st.session_state.turn_phase = "listening"
             st.session_state.questions_asked_this_turn += 1
             
-            # This line forces the bonus question to read out loud seamlessly!
             st.session_state.audio_to_play = f"That is correct! You earned a bonus question. Your new category is {st.session_state.chosen_category}. {q}"
             st.rerun()
 
@@ -255,7 +257,6 @@ else:
         st.title(f"🏆 {current_player} WINS THE GAME! 🏆")
         st.success(f"Incredible! The winning answer was '{st.session_state.current_answer}' and you completely nailed it.")
         
-        # Play the grand victory audio once
         st.session_state.audio_to_play = f"Congratulations to {current_player}, you are the trivial pursuit grand champion!"
         
         if st.button("Play Again 🔄", use_container_width=True):
