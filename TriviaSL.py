@@ -36,6 +36,7 @@ def autoplay_audio(text):
         mp3_fp.seek(0)
         b64 = base64.b64encode(mp3_fp.read()).decode()
         
+        # Isolated HTML5 audio block that auto-plays cleanly
         md = f"""
             <iframe src="data:audio/mp3;base64,{b64}" allow="autoplay" style="display:none" id="audio_iframe"></iframe>
             <audio autoplay style="display:none;">
@@ -85,7 +86,7 @@ if "game_started" not in st.session_state:
     st.session_state.players = []
     st.session_state.game_state = {}
     st.session_state.current_idx = 0
-    st.session_state.turn_phase = "start"  # Phases: "start", "listening", "resolved", "game_over"
+    st.session_state.turn_phase = "start"
     st.session_state.current_question = ""
     st.session_state.current_answer = ""
     st.session_state.chosen_category = ""
@@ -120,6 +121,7 @@ if not st.session_state.game_started:
 else:
     st.title("🎲 Trivial Pursuit Party")
     
+    # Run audio if there is any queued up for this specific page render
     if st.session_state.audio_to_play:
         autoplay_audio(st.session_state.audio_to_play)
         st.session_state.audio_to_play = "" 
@@ -162,7 +164,7 @@ else:
         if announcement:
             st.warning(announcement)
         
-        if st.button("🎙️ Start Turn & Speak Question", use_container_width=True):
+        if st.button("🎙️ Load & Hear Question", use_container_width=True):
             q, a = fetch_filtered_question(st.session_state.chosen_category)
             st.session_state.current_question = q
             st.session_state.current_answer = a
@@ -175,13 +177,15 @@ else:
                 st.session_state.audio_to_play = f"{current_player}, your category is {st.session_state.chosen_category}. Here is the question: {q}"
             st.rerun()
 
-    # --- PHASE 2: LISTENING MODE ---
+    # --- PHASE 2: LISTENING FOR SPOKEN ANSWER ---
     elif st.session_state.turn_phase == "listening":
         st.markdown(f"### Category: *{st.session_state.chosen_category}*")
         st.warning(f"**Question for {current_player}:** {st.session_state.current_question}")
         
+        # Action Bar: Repeat Question Side-by-Side with the host expander
         col1, col2 = st.columns([1, 1])
         with col1:
+            # We explicitly target the audio queue and reset the mic instance key so it triggers fresh audio
             if st.button("🔊 Repeat Question", use_container_width=True):
                 st.session_state.audio_to_play = f"The question is: {st.session_state.current_question}"
                 st.rerun()
@@ -189,15 +193,9 @@ else:
             with st.expander("Show Secret Answer"):
                 st.write(f"Expected Answer: **{st.session_state.current_answer}**")
             
-        st.write("Blurt out your answer clearly, then click the stop button to process:")
+        st.write("Tap the microphone button, say your answer clearly, and stop recording:")
         
-        # We explicitly changed start_prompt to indicate it's running immediately
-        spoken_text = speech_to_text(
-            start_prompt="🔴 CLICK HERE TO STOP & SUBMIT", 
-            stop_prompt="⏹️ PROCESSING...", 
-            language='en', 
-            key=f'speech_{st.session_state.questions_asked_this_turn}'
-        )
+        spoken_text = speech_to_text(start_prompt="🔴 TAP TO RECORD ANSWER", stop_prompt="⏹️ STOP", language='en', key=f'speech_{st.session_state.questions_asked_this_turn}')
         
         if spoken_text:
             user_ans = spoken_text.strip().lower()
@@ -219,15 +217,7 @@ else:
                         st.session_state.turn_phase = "resolved"
                         st.session_state.audio_to_play = f"That is correct! You have unlocked your final category. Your turn is complete."
                     elif st.session_state.questions_asked_this_turn < 2:
-                        # Auto-load the bonus round details behind the scenes
-                        remaining = list(set(CATEGORY_MAP.keys()) - st.session_state.game_state[current_player]["completed_categories"])
-                        st.session_state.chosen_category = random.choice(remaining)
-                        q, a = fetch_filtered_question(st.session_state.chosen_category)
-                        st.session_state.current_question = q
-                        st.session_state.current_answer = a
-                        st.session_state.questions_asked_this_turn += 1
-                        st.session_state.audio_to_play = f"That is correct! You earned a bonus question. Your new category is {st.session_state.chosen_category}. {q}"
-                        st.rerun()
+                        st.session_state.turn_phase = "bonus_ready"
                     else:
                         st.session_state.turn_phase = "resolved"
                         st.session_state.audio_to_play = f"That is correct! Category unlocked."
@@ -236,17 +226,34 @@ else:
                 st.session_state.audio_to_play = f"Incorrect. You said {user_ans}. The correct answer was {correct_ans}."
             st.rerun()
 
+    # --- PHASE 2.5: BONUS READY TRAFFIC CONTROL ---
+    elif st.session_state.turn_phase == "bonus_ready":
+        st.success(f"Correct! You said '{st.session_state.user_said}'. Category unlocked!")
+        
+        if st.button("Bring on the Bonus Question! ➡️", use_container_width=True):
+            remaining = list(set(CATEGORY_MAP.keys()) - st.session_state.game_state[current_player]["completed_categories"])
+            st.session_state.chosen_category = random.choice(remaining)
+            
+            q, a = fetch_filtered_question(st.session_state.chosen_category)
+            st.session_state.current_question = q
+            st.session_state.current_answer = a
+            st.session_state.turn_phase = "listening"
+            st.session_state.questions_asked_this_turn += 1
+            
+            st.session_state.audio_to_play = f"That is correct! You earned a bonus question. Your new category is {st.session_state.chosen_category}. {q}"
+            st.rerun()
+
     # --- PHASE 3: TURN CONCLUDED ---
     elif st.session_state.turn_phase == "resolved":
         if st.session_state.was_correct:
             st.success(f"Correct! You said '{st.session_state.user_said}'.")
             if len(st.session_state.game_state[current_player]["completed_categories"]) == 6:
                 st.balloons()
-                st.info("6 categories reached! Round finishes. Next turn you play for the grand win!")
+                st.info("6 categories reached! Turn ends automatically. Next round you go for the win.")
         else:
             st.error(f"Incorrect. You said '{st.session_state.user_said}'. The correct answer was: {st.session_state.current_answer}")
             
-        if st.button("Next Turn ➡️", use_container_width=True):
+        if st.button("Pass Phone to Next Player ➡️", use_container_width=True):
             st.session_state.questions_asked_this_turn = 0
             st.session_state.current_idx = (st.session_state.current_idx + 1) % len(players)
             st.session_state.turn_phase = "start"
